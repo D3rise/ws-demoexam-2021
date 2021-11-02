@@ -34,7 +34,16 @@ contract Ledger {
         uint256[] recievedTransfers; // Полученные переводы
     }
 
+    // Структура голосования за повышения пользователя до уровня администратора
+    struct UserUpgradePoll {
+        address payable user;
+        address payable[] adminsApproved;
+    }
+
     mapping(address => User) users; // пользователи по адресам в блокчейне
+    mapping(address => UserUpgradePoll) userUpgradePolls; // голосования за повышение пользователя до уровня администратора
+    address[] userUpgradePollsAddresses;
+
     mapping(uint256 => Transfer) transfers; // переводы
 
     mapping(string => Category) categories; // категории по названиям
@@ -44,6 +53,52 @@ contract Ledger {
     string[] templateNames; // имена шаблонов, индексы соответсвуют ID
 
     uint256 numTransfers; // общее количество переводов
+
+    constructor() {
+        uint256[] memory defArray;
+        bytes32 defaultPasswordHash = keccak256(abi.encodePacked("123"));
+
+        // Users
+        users[0xd3d512f5D54cAB705962b8F5B18887FeA0cEdc09] = User(
+            defaultPasswordHash,
+            false,
+            defArray,
+            defArray
+        );
+        users[0xFF164757CDAeB859Ea01B793Eb5eEA1e30b80c06] = User(
+            defaultPasswordHash,
+            false,
+            defArray,
+            defArray
+        );
+        users[0xBc3E4436595F40c7eC699d79cB7B5ef26fEc68fA] = User(
+            defaultPasswordHash,
+            false,
+            defArray,
+            defArray
+        );
+        users[0xc46a163cB71A6E0ab221fbE68Ecfb11B3b79b8f5] = User(
+            defaultPasswordHash,
+            false,
+            defArray,
+            defArray
+        );
+
+        // Admins
+        users[0x56d8C3c6E4815d10Daa12466B1c8D77C5DDaA2b6] = User(
+            defaultPasswordHash,
+            true,
+            defArray,
+            defArray
+        );
+
+        users[0xafB6cEE6479737EA310C24FBc00e0D71C8BecF8d] = User(
+            defaultPasswordHash,
+            true,
+            defArray,
+            defArray
+        );
+    }
 
     // Проверяет, администратор ли пользователь
     modifier onlyAdmin() {
@@ -175,6 +230,57 @@ contract Ledger {
         returns (Transfer memory)
     {
         return transfers[transferID];
+    }
+
+    // Начать голосование за повышение пользователя до уровня админа/проголосовать за повышение
+    function voteForUpgradingUser(address payable user)
+        public
+        onlyAdmin
+        returns (bool)
+    {
+        bool pollExists; // Существует ли такое голосование
+        for (uint256 i = 0; i < userUpgradePollsAddresses.length; i++) {
+            if (userUpgradePollsAddresses[i] == user) {
+                pollExists = true;
+                break;
+            }
+        }
+        // Если не существует, создаем новое
+        if (!pollExists) userUpgradePollsAddresses.push(user);
+
+        // Голосовал ли админ за повышение этого пользователя или нет
+        bool adminExists;
+        address payable[] memory adminsApproved = userUpgradePolls[user]
+            .adminsApproved;
+        for (uint256 i = 0; i < adminsApproved.length; i++) {
+            if (adminsApproved[i] == msg.sender) {
+                adminExists = true;
+                break;
+            }
+        }
+
+        // Если не голосовал - голосуем и возвращаем положительный ответ
+        if (!adminExists) {
+            userUpgradePolls[user].adminsApproved.push(payable(msg.sender));
+            return true;
+        }
+
+        // Если уже голосовал - возвращаем негативный ответ
+        return false;
+    }
+
+    // Получить список голосований за повышение юзера
+    function getUserUpgradePolls() public view returns (address[] memory) {
+        return userUpgradePollsAddresses;
+    }
+
+    // Получить подробную инфу о голосовании за повышение юзера
+    function getUserUpgradePoll(address user)
+        public
+        view
+        returns (UserUpgradePoll memory)
+    {
+        return userUpgradePolls[user];
     }
 
     // Добавить категорию
