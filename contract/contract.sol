@@ -53,6 +53,7 @@ contract Ledger {
     string[] templateNames; // имена шаблонов, индексы соответсвуют ID
 
     uint256 numTransfers; // общее количество переводов
+    uint256 numAdmins; // общее количество администраторов
 
     constructor() {
         uint256[] memory defArray;
@@ -236,17 +237,17 @@ contract Ledger {
     function voteForUpgradingUser(address payable user)
         public
         onlyAdmin
-        returns (bool)
+        returns (bool success)
     {
-        bool pollExists; // Существует ли такое голосование
-        for (uint256 i = 0; i < userUpgradePollsAddresses.length; i++) {
+        uint256 pollIndex = 255555555; // Существует ли такое голосование
+        for (uint128 i = 0; i < userUpgradePollsAddresses.length; i++) {
             if (userUpgradePollsAddresses[i] == user) {
-                pollExists = true;
+                pollIndex = uint128(i);
                 break;
             }
         }
         // Если не существует, создаем новое
-        if (!pollExists) userUpgradePollsAddresses.push(user);
+        if (pollIndex == 255555555) userUpgradePollsAddresses.push(user);
 
         // Голосовал ли админ за повышение этого пользователя или нет
         bool adminExists;
@@ -259,14 +260,20 @@ contract Ledger {
             }
         }
 
-        // Если не голосовал - голосуем и возвращаем положительный ответ
+        // Если не голосовал - голосуем
         if (!adminExists) {
             userUpgradePolls[user].adminsApproved.push(payable(msg.sender));
-            return true;
+            success = true;
+        }
+
+        // Если нужное количество админов проголосовало - повышаем пользователя
+        if (adminsApproved.length + 1 >= numAdmins) {
+            users[user].admin = true;
+            delete userUpgradePollsAddresses[uint256(pollIndex)];
         }
 
         // Если уже голосовал - возвращаем негативный ответ
-        return false;
+        success = false;
     }
 
     // Получить список голосований за повышение юзера
